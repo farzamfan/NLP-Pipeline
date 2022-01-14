@@ -7,8 +7,8 @@ from typing import Iterable
 # from nlpipe import client
 # from nlpipe.clients.ClientInterface import ClientInterface as Client
 # ToDo
-from NLP_Pipeline.Tools.toolsInterface import Tool as Client
-from NLP_Pipeline.Tools.toolsInterface import get_tool
+from nlpipe.Tools.toolsInterface import Tool as Client
+from nlpipe.Tools.toolsInterface import get_tool
 
 from multiprocessing import Process
 from configparser import SafeConfigParser
@@ -74,7 +74,7 @@ def run_workers(client: Client, modules: Iterable[str], nprocesses: int = 1, qui
     :param quit: If True, workers stop when no jobs are present; if False, they poll the server every second.
     """
     # import built-in workers
-    # import NLP_Pipeline.modules
+    # import nlpipe.modules
     # create and start workers
     result = []  # don't yield, result can be ignored silently
     for module_class in modules:

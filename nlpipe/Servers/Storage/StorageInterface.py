@@ -1,7 +1,7 @@
 import time
 import itertools
 
-from NLP_Pipeline.Servers.Storage.utils import get_id
+from nlpipe.Servers.Storage.utils import get_id
 
 
 class StorageInterface(object):

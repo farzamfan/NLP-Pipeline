@@ -3,12 +3,12 @@
 from distutils.core import setup
 
 setup(
-    name="NLP_Pipeline",
-    version="0.1",
+    name="nlpipe",
+    version="0.54",
     description="Simple NLP Pipelinining based on a file system",
-    author="Farzam Fanitabasi",
-    author_email="f.fanitabasi@vu.nl",
-    packages=["NLP_Pipeline"],
+    authors=["Wouter van Atteveldt", "Farzam Fanitabasi"],
+    author_email="wouter@vanatteveldt.com",
+    packages=["nlpipe", "nlpipe.Clients", "nlpipe.Servers", "nlpipe.Tools", "nlpipe.Workers"],
     include_package_data=True,
     zip_safe=False,
     keywords=["NLP", "pipelining"],
@@ -27,6 +27,7 @@ setup(
         "KafNafParserPy",
         "PyJWT",
         "pytest",
-        "pytest-flask"
+        "pytest-flask",
+        "peewee"
     ]
 )

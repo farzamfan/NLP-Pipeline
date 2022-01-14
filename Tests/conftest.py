@@ -1,9 +1,9 @@
 import json
 import pytest
 
-import NLP_Pipeline.Servers.server
+import nlpipe.Servers.server
 
 
 @pytest.fixture()
 def app():
-    return NLP_Pipeline.Servers.server.app
+    return nlpipe.Servers.server.app

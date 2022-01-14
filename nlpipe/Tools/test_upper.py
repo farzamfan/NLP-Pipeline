@@ -2,7 +2,7 @@
 Trivial test module that converts to upper case
 """
 
-from NLP_Pipeline.Tools.toolsInterface import Tool
+from nlpipe.Tools.toolsInterface import Tool
 import json
 
 

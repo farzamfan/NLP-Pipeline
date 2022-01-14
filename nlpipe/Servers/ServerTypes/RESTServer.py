@@ -4,8 +4,10 @@ from functools import wraps
 from flask import Blueprint, request, make_response, Response, jsonify
 from flask.templating import render_template
 
-from NLP_Pipeline.Tools.toolsInterface import UnknownModuleError, get_tool, known_tools
-from NLP_Pipeline.Servers.helpers import STATUS_CODES, ERROR_MIME, do_check_auth, LoginFailed
+from nlpipe.Servers.Storage.DatabaseStorage import Task
+
+from nlpipe.Tools.toolsInterface import UnknownModuleError, get_tool, known_tools
+from nlpipe.Servers.helpers import STATUS_CODES, ERROR_MIME, do_check_auth, LoginFailed
 
 """
 NLPipe REST Server that manages the direct filesystem access (e.g. on local machine or over NFS)
@@ -40,28 +42,31 @@ def index():
     return render_template('index.html', **locals())
 
 
-@app_restServer.route('/api/modules/<module>/', methods=['POST'])
+@app_restServer.route('/api/modules/<tool>/', methods=['POST'])
 @check_auth
-def post_task(module):
+def post_task(tool):
     """
     POST a new task to the NLPipe server.
-    Post body should contain the test to process.
+    Post body should contain the text/doc to process.
     You can specify an explicit document id with ?id=<id>
     Response will be an empty HTTP 202 response with Location and ID headers
 
-    :param module: The name of the module to process with
+    :param tool: The name of the tool to process with
     """
     try:
-        get_tool(module)  # check if module exists
+        get_tool(tool)  # check if tool exists
     except UnknownModuleError as e:
         return str(e), 404
-    doc = request.get_data().decode('UTF-8')
-    id = request.args.get("id")
-    id = app_restServer.docStorageModule.process(module, doc, id=id)
-    resp = Response(id + "\n", status=202)
-    resp.headers['Location'] = '/api/modules/{module}/{id}'.format(**locals())
-    resp.headers['ID'] = id
-    return resp
+
+    doc = request.get_data().decode('UTF-8')  # get the document
+    task_id = Task.insert({'tool': tool, 'docs': doc, 'status': "PENDING"}).execute()  # adding the task to db
+    doc_id = app_restServer.docStorageModule.\
+        process(tool, doc, doc_id=request.args.get("id"), task_id=task_id)  # stores the doc, and if needed generates the id
+    resp = Response(doc_id + "\n", status=202)  # create a response object
+    resp.headers['Location'] = '/api/tools/{tool}/{doc_id}'.format(**locals())  # endpoint to access doc
+    resp.headers['TASK_ID'] = task_id  # add task_id to the response header
+    resp.headers['ID'] = doc_id  # add id to the response header
+    return resp  # return a response to the use
 
 
 @app_restServer.route('/api/modules/<module>/<id>', methods=['HEAD'])
@@ -142,68 +147,67 @@ def put_results(module, id):
     return '', 204
 
 
-@app_restServer.route('/api/modules/<module>/bulk/status', methods=['POST'])
-@check_auth
-def bulk_status(module):
-    """
-    Bulk method: POST a json list of IDs to get status information from.
-    Returns a json dict of {id: status}
-
-    :param module: The module name
-    """
-    try:
-        ids = request.get_json(force=True)
-        if not ids:
-            raise ValueError("Empty request")
-    except:
-        return "Error: Please provive bulk IDs as a json list\nd ", 400
-    statuses = {id: app_restServer.docStorageModule.status(module, str(id)) for id in ids}
-    return json.dumps(statuses, indent=4), 200
-
-
-@app_restServer.route('/api/modules/<module>/bulk/result', methods=['POST'])
-@check_auth
-def bulk_result(module):
-    """
-    Bulk method: POST a json list of IDs to get results for.
-    Returns a json dict of {id: result}
-
-    :param module: The module name
-    """
-    try:
-        ids = request.get_json(force=True)
-        if not ids:
-            raise ValueError("Empty request")
-    except:
-        return "Error: Please provive bulk IDs as a json list\nd ", 400
-    format = request.args.get('format', None)
-    results = app_restServer.docStorageModule.bulk_result(module, ids, format=format)
-    return jsonify(results)
-
-
-@app_restServer.route('/api/modules/<module>/bulk/process', methods=['POST'])
-@check_auth
-def bulk_process(module):
-    """
-    Bulk method: POST a json list or {id: text} dict containing texts to process
-    Returns a json list of ids
-
-    :param module: The module name
-    """
-    reset_error = request.args.get('reset_error', False) in ('1', 'Y', 'True')
-    reset_pending = request.args.get('reset_pending', False) in ('1', 'Y', 'True')
-    try:
-        docs = request.get_json(force=True)
-        if not docs:
-            raise ValueError("Empty request")
-    except:
-        logging.exception("bulk/process: Error parsing json {}".format(repr(request.data)[:20]))
-        return "Error: Please provive bulk docs as a json list or {id:doc, } dict\n ", 400
-    if isinstance(docs, list):
-        docs, ids = docs, None
-    else:
-        docs, ids = docs.values(), docs.keys()
-    ids = app_restServer.docStorageModule.bulk_process(module, docs, ids=ids,
-                                                       reset_error=reset_error, reset_pending=reset_pending)
-    return jsonify(ids)
-
+# @app_restServer.route('/api/modules/<module>/bulk/status', methods=['POST'])
+# @check_auth
+# def bulk_status(module):
+#     """
+#     Bulk method: POST a json list of IDs to get status information from.
+#     Returns a json dict of {id: status}
+#
+#     :param module: The module name
+#     """
+#     try:
+#         ids = request.get_json(force=True)
+#         if not ids:
+#             raise ValueError("Empty request")
+#     except:
+#         return "Error: Please provive bulk IDs as a json list\nd ", 400
+#     statuses = {id: app_restServer.docStorageModule.status(module, str(id)) for id in ids}
+#     return json.dumps(statuses, indent=4), 200
+#
+#
+# @app_restServer.route('/api/modules/<module>/bulk/result', methods=['POST'])
+# @check_auth
+# def bulk_result(module):
+#     """
+#     Bulk method: POST a json list of IDs to get results for.
+#     Returns a json dict of {id: result}
+#
+#     :param module: The module name
+#     """
+#     try:
+#         ids = request.get_json(force=True)
+#         if not ids:
+#             raise ValueError("Empty request")
+#     except:
+#         return "Error: Please provive bulk IDs as a json list\nd ", 400
+#     format = request.args.get('format', None)
+#     results = app_restServer.docStorageModule.bulk_result(module, ids, format=format)
+#     return jsonify(results)
+#
+#
+# @app_restServer.route('/api/modules/<module>/bulk/process', methods=['POST'])
+# @check_auth
+# def bulk_process(module):
+#     """
+#     Bulk method: POST a json list or {id: text} dict containing texts to process
+#     Returns a json list of ids
+#
+#     :param module: The module name
+#     """
+#     reset_error = request.args.get('reset_error', False) in ('1', 'Y', 'True')
+#     reset_pending = request.args.get('reset_pending', False) in ('1', 'Y', 'True')
+#     try:
+#         docs = request.get_json(force=True)
+#         if not docs:
+#             raise ValueError("Empty request")
+#     except:
+#         logging.exception("bulk/process: Error parsing json {}".format(repr(request.data)[:20]))
+#         return "Error: Please provive bulk docs as a json list or {id:doc, } dict\n ", 400
+#     if isinstance(docs, list):
+#         docs, ids = docs, None
+#     else:
+#         docs, ids = docs.values(), docs.keys()
+#     ids = app_restServer.docStorageModule.bulk_process(module, docs, ids=ids,
+#                                                        reset_error=reset_error, reset_pending=reset_pending)
+#     return jsonify(ids)

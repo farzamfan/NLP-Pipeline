@@ -3,9 +3,11 @@ import errno
 import logging
 import subprocess
 
-from NLP_Pipeline.Tools.toolsInterface import get_tool, get_known_tools
-from NLP_Pipeline.Servers.Storage.utils import STATUS, get_id
-from NLP_Pipeline.Servers.Storage.StorageInterface import StorageInterface
+from nlpipe.Servers.Storage.DatabaseStorage import Docs
+
+from nlpipe.Tools.toolsInterface import get_tool, get_known_tools
+from nlpipe.Servers.Storage.utils import STATUS, get_id
+from nlpipe.Servers.Storage.StorageInterface import StorageInterface
 
 
 class FileSystemStorage(StorageInterface):
@@ -64,20 +66,37 @@ class FileSystemStorage(StorageInterface):
                 return status
         return 'UNKNOWN'
 
-    def process(self, module, doc, id=None, reset_error=False, reset_pending=False):
-        if id is None:
-            id = get_id(doc)
-        status = self.status(module, id)
-        if status == 'UNKNOWN':
-            logging.debug("Assigning doc {id} to {module}".format(**locals()))
-            self._write(module, 'PENDING', id, doc)
-        elif (status == "ERROR" and reset_error) or (status == "STARTED" and reset_pending):
-            logging.debug("Re-assigning doc {id} with status {status} to {module}".format(**locals()))
-            self._delete(module, status, id)
-            self._write(module, 'PENDING', id, doc)
+    def process(self, tool, doc, doc_id=None, task_id=None, reset_error=False, reset_pending=False):
+        """
+        Process the task based on the status of the current document.
+        - If "UNKNOWN": it stores the doc using the docStorageModule, and changes the status to "PENDING"
+        - if "ERROR" or "STARTED" & reset_pending == TRUE: replaces the previous doc and changes the status to "PENDING"
+        :param tool: NLP text processing tool (e.g., UPPER_CASE)
+        :param doc: document which the NLP task is executed on
+        :param doc_id: id of the document
+        :param task_id: id of the task (foreign key)
+        :param reset_error: --
+        :param reset_pending: --
+        :return:å
+        """
+        if doc_id is None:
+            doc_id = get_id(doc)
+        doc_status = self.status(tool, doc_id)
+        if doc_status == 'UNKNOWN':
+            logging.debug("Assigning doc {doc_id} to {tool}".format(**locals()))
+            fn = self._write(tool, 'PENDING', doc_id, doc)  # create the file and store the doc
+            Docs.insert({'doc_id': doc_id, 'task_id': task_id,
+                         'path': self._filename(tool, "PENDING"),
+                         'status': "PENDING"}).execute()  # adding the doc to the db
+        elif (doc_status == "ERROR" and reset_error) or (doc_status == "STARTED" and reset_pending):
+            logging.debug("Re-assigning doc {doc_id} with status {status} to {tool}".format(**locals()))
+            self._delete(tool, doc_status, doc_id)
+            self._write(tool, 'PENDING', doc_id, doc)
+            Docs.update({Docs.status: "PENDING"}).\
+                where(Docs.doc_id == doc_id).execute()  # update the status of the doc in db
         else:
-            logging.debug("Document {id} had status {}".format(self.status(module, id), **locals()))
-        return id
+            logging.debug("Document {doc_id} had status {}".format(self.status(tool, doc_id), **locals()))
+        return doc_id
 
     def result(self, module, id, format=None):
         status = self.status(module, id)
