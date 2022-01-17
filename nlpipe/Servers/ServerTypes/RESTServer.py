@@ -42,7 +42,7 @@ def index():
     return render_template('index.html', **locals())
 
 
-@app_restServer.route('/api/modules/<tool>/', methods=['POST'])
+@app_restServer.route('/api/tools/<tool>/', methods=['POST'])
 @check_auth
 def post_task(tool):
     """
@@ -60,8 +60,9 @@ def post_task(tool):
 
     doc = request.get_data().decode('UTF-8')  # get the document
     task_id = Task.insert({'tool': tool, 'docs': doc, 'status': "PENDING"}).execute()  # adding the task to db
-    doc_id = app_restServer.docStorageModule.\
-        process(tool, doc, doc_id=request.args.get("id"), task_id=task_id)  # stores the doc, and if needed generates the id
+    doc_id = app_restServer.docStorageModule.process(tool,
+                                                     doc, doc_id=request.args.get("id"),  # in case it is given
+                                                     task_id=task_id)  # stores the doc, and if needed generates the id
     resp = Response(doc_id + "\n", status=202)  # create a response object
     resp.headers['Location'] = '/api/tools/{tool}/{doc_id}'.format(**locals())  # endpoint to access doc
     resp.headers['TASK_ID'] = task_id  # add task_id to the response header
@@ -69,81 +70,97 @@ def post_task(tool):
     return resp  # return a response to the use
 
 
-@app_restServer.route('/api/modules/<module>/<id>', methods=['HEAD'])
+@app_restServer.route('/api/tools/<tool>/<id>', methods=['HEAD'])
 @check_auth
-def task_status(module, id):
+def doc_status(tool, id):
     """
-    HEAD gets the status of a task as HTTP Status code.
+    HEAD gets the status of a document as HTTP Status code.
     Response will also contain a status header.
-
-    :param module: The module name
-    :param id: ID of the task to get status for
+    :param tool: The module name
+    :param id: ID of the document to get status for
     """
-    status = app_restServer.docStorageModule.status(module, id)
+    status = app_restServer.docStorageModule.status(tool, id)
     resp = Response(status=STATUS_CODES[status])
     resp.headers['Status'] = status
     return resp
 
 
-@app_restServer.route('/api/modules/<module>/<id>', methods=['GET'])
+@app_restServer.route('/api/tasks/<task_id>', methods=['HEAD'])
 @check_auth
-def result(module, id):
+def task_status(task_id):
+    """
+    HEAD gets the status of a task as HTTP Status code.
+    Response will also contain a status header.
+
+    :param task_id: ID of the task to get status for
+    """
+    status = Task.get(Task.id == task_id).status
+    resp = Response(status=STATUS_CODES[status])
+    resp.headers['Status'] = status
+    return resp
+
+
+@app_restServer.route('/api/tools/<tool>/<doc_id>', methods=['GET'])
+@check_auth
+def result(tool, doc_id):
     """
     GET the processed result of a task.
     If processed OK, returns the result as document with HTTP 200
     If processing failed, returns HTTP 500 with a json document containing the exception
     If task is unknown or not yet processed, will return 404
 
-    :param module: The module name
-    :param id: ID of the task to get result for
+    :param tool: The tool name
+    :param doc_id: ID of the task to get result for
     """
-    format = request.args.get('format', None)
+    return_format = request.args.get('format', None)
     try:
-        result = app_restServer.docStorageModule.result(module, id, format=format)
+        res = app_restServer.docStorageModule.result(tool, doc_id, return_format=return_format)
     except FileNotFoundError:
-        return 'Error: Unknown document: {module}/{id}\n'.format(**locals()), 404
+        return 'Error: Unknown document: {tool}/{id}\n'.format(**locals()), 404
     except Exception as e:
-        result = {"exception_class": type(e).__name__, "message": str(e)}
+        res = {"exception_class": type(e).__name__, "message": str(e)}
         return make_response(jsonify(result), 500)
-    return result, 200
+    return res, 200
 
 
-@app_restServer.route('/api/modules/<module>/', methods=['GET'])
+@app_restServer.route('/api/tools/<tool>/', methods=['GET'])
 @check_auth
-def get_task(module):
+def get_task(tool):
     """
     GET a task to process.
     This is intended to be called by a worker and will set status of the task to STARTED.
     Returns the text to process with HTTP headers ID and Location
 
-    :param module: Module name
+    :param tool: tool name
     """
-    id, doc = app_restServer.docStorageModule.get_task(module)
-    if doc is None:
-        return 'Queue {module} empty!\n'.format(**locals()), 404
-    resp = Response(doc, status=200)
-    resp.headers['Location'] = '/api/modules/{module}/{id}'.format(**locals())
-    resp.headers['ID'] = id
+    doc_id, doc = app_restServer.docStorageModule.get_task(tool)  # get the doc_id and the document
+
+    if doc is None:  # document does not exist
+        return 'Queue {tool} empty!\n'.format(**locals()), 404
+
+    resp = Response(doc, status=200)  # attach the document (unprocessed at this point) to the response
+    resp.headers['Location'] = '/api/tools/{tool}/{doc_id}'.format(**locals())  # endpoint for the document
+    resp.headers['ID'] = doc_id  # document id in the database (queuing system)
     return resp
 
 
-@app_restServer.route('/api/modules/<module>/<id>', methods=['PUT'])
+@app_restServer.route('/api/tools/<tool>/<doc_id>', methods=['PUT'])
 @check_auth
-def put_results(module, id):
+def put_results(tool, doc_id):
     """
     PUT the results of processing.
     If processing failed, use Content-type: prs.error+text and put the error message or diagnostics
-    This is intended to be callsed by a worker and will set the status of the task to DONE or ERROR.
+    This is intended to be called by a worker and will set the status of the task to DONE or ERROR.
 
-    :param module:
-    :param id:
+    :param tool: name of the tool
+    :param doc_id: id of the document
     :return:
     """
     doc = request.get_data().decode('UTF-8')
     if request.content_type == ERROR_MIME:
-        app_restServer.docStorageModule.store_error(module, id, doc)
+        app_restServer.docStorageModule.store_error(tool, doc_id, doc)
     else:
-        app_restServer.docStorageModule.store_result(module, id, doc)
+        app_restServer.docStorageModule.store_result(tool, doc_id, doc)
     return '', 204
 
 
