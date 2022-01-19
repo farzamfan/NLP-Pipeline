@@ -22,8 +22,7 @@ class LoginFailed(Exception):
     pass
 
 
-# perform authentication
-def do_check_auth():
+def do_check_auth():  # perform authentication
     auth_header = request.headers.get('Authorization')
     if not auth_header:
         raise LoginFailed("No authentication supplied\n")

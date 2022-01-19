@@ -13,12 +13,12 @@ class TestUpper(Tool):
         pass
 
     def process(self, text):
-        return text.upper()
+        return text.upper()  # converts text to uppercase
 
-    def convert(self, id, result, format):
-        if format == "json":
-            return json.dumps({"id": id, "status": "OK", "result": result})
-        super().convert(result, format)
+    def convert(self, doc_id, result, return_format):
+        if return_format == "json":
+            return json.dumps({"doc_id": doc_id, "status": "OK", "result": result})
+        super().convert(result, return_format)
 
 
-TestUpper.register()
+TestUpper.register()  # register the tool in known_tools

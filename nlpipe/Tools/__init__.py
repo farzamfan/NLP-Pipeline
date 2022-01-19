@@ -1,1 +1,1 @@
-from . import test_upper
+from . import test_upper  # forces the tools to register themselves

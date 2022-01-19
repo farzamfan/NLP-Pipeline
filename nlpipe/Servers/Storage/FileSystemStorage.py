@@ -3,10 +3,10 @@ import errno
 import logging
 import subprocess
 
-from nlpipe.Servers.Storage.DatabaseStorage import Docs
+from nlpipe.TaskManagers.DatabaseTaskManager import Docs
 
 from nlpipe.Tools.toolsInterface import get_tool, get_known_tools
-from nlpipe.Servers.Storage.utils import STATUS, get_id
+from nlpipe.Utils.utils import STATUS, get_id
 from nlpipe.Servers.Storage.StorageInterface import StorageInterface
 
 

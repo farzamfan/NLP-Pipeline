@@ -1,4 +1,4 @@
-# NLPipe [![Build Status](https://travis-ci.org/vanatteveldt/nlpipe.png?branch=master)](https://travis-ci.org/vanatteveldt/nlpipe)
+# NLPipe [![Build Status](https://travis-ci.org/ccs-Amsterdam/nlpipe.png?branch=master)](https://travis-ci.org/ccs-Amsterdam/nlpipe)
 
 Client/server based NLP Pipelining
 
@@ -27,10 +27,12 @@ a ready-to-run docker image.
 Do (possibly as superuser):
 
 ```{sh}
-docker run --name nlpipe -dp 5001:5001 vanatteveldt/nlpipe
+docker run --name nlpipe -dp 5001:5001 ccs-amsterdam/nlpipe
 ```
 
-This will pull the nlpipe docker image and run the nlpipe restserver on port 5001 and by default run all known worker modules. Note: The `-d` means that the docker process will be 'detached', i.e. run in the background. 
+This will pull the nlpipe docker image and run the nlpipe server.
+By default, nlpipe server is a RESTFul server on port 5001 and runs all known worker modules. 
+Note: The `-d` means that the docker process will be 'detached', i.e. run in the background. 
 
 To see (or *f*ollow) the logs of a running worker, use:
 
@@ -45,7 +47,7 @@ To install nlpipe locally, it is best to create a virtual environment and instal
 
 ```{sh}
 pyvenv env
-env/bin/pip install -e git+git://github.com/vanatteveldt/nlpipe.git#egg=nlpipe
+env/bin/pip install -e git+git://github.com/ccs-amsterdam/nlpipe.git#egg=nlpipe
 ```
 
 Now you can run nlpipe from the created environment. e.g. to run a
@@ -53,7 +55,7 @@ webserver that listens  http://localhost:5001 in test-mode, open a separate
 terminal, "source" the Python virtual environment and do e.g.:
 
 ```{sh}
-env/bin/python -m nlpipe.restserver
+env/bin/python -m nlpipe.Servers.server --disable-authentication --verbose
 ```
 
 The program prints
@@ -71,7 +73,7 @@ demo processor-module `test_upper`. To set up a worker for this module, open a
 separate xterm, source the Python virtual environment in it and do e.g.:
 
 ```{sh}
-$ env/bin/python -m nlpipe.worker http://localhost:5001 test_upper
+$ env/bin/python -m nlpipe.Workers.worker http://localhost:5001 test_upper
 ```
 
 The program responds with
@@ -90,11 +92,11 @@ been pre-installed there.
 NLPipe provides a client to communicate with the server. To use it, do e.g.
 
 ```{sh}
-$ env/bin/python -m nlpipe.client http://localhost:5001 test_upper process "this is a test"
+$ env/bin/python -m nlpipe.Clients.client http://localhost:5001 test_upper process "this is a test"
 0x54b0c58c7ce9f2a8b551351102ee0938
-$ env/bin/python -m nlpipe.client http://localhost:5001 test_upper status 0x54b0c58c7ce9f2a8b551351102ee0938
+$ -m nlpipe.Clients.client http://localhost:5001 test_upper doc_status 0x54b0c58c7ce9f2a8b551351102ee0938
 DONE
-$ env/bin/python -m nlpipe.client http://localhost:5001 test_upper result 0x54b0c58c7ce9f2a8b551351102ee0938
+$ env/bin/python -m nlpipe.Clients.client http://localhost:5001 test_upper result 0x54b0c58c7ce9f2a8b551351102ee0938
 THIS IS A TEST
 ```
 

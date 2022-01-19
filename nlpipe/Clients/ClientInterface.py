@@ -4,7 +4,7 @@ import itertools
 from nlpipe.Utils.utils import get_id
 
 
-class StorageInterface(object):
+class ClientInterface(object):
     """Abstract class for NLPipe client bindings"""
 
     def process(self, module, doc, id=None, reset_error=False, reset_pending=False):
